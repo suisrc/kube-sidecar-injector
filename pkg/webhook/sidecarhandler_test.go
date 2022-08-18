@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/expediagroup/kubernetes-sidecar-injector/pkg/admission"
 	"github.com/stretchr/testify/assert"
+	"github.com/suisrc/kube-sidecar-injector/pkg/admission"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -40,7 +40,7 @@ func TestSidecarInjectorPatcher_PatchPodCreate(t *testing.T) {
 			name: "pod with no annotations",
 			fields: fields{
 				K8sClient:      fake.NewSimpleClientset(),
-				InjectPrefix:   "sidecar-injector.expedia.com",
+				InjectPrefix:   "sidecar-injector.suisrc.com",
 				InjectName:     "inject",
 				SidecarDataKey: "sidecars.yaml",
 			},
@@ -55,7 +55,7 @@ func TestSidecarInjectorPatcher_PatchPodCreate(t *testing.T) {
 			name: "pod with sidecar annotations no sidecar",
 			fields: fields{
 				K8sClient:      fake.NewSimpleClientset(),
-				InjectPrefix:   "sidecar-injector.expedia.com",
+				InjectPrefix:   "sidecar-injector.suisrc.com",
 				InjectName:     "inject",
 				SidecarDataKey: "sidecars.yaml",
 			},
@@ -63,7 +63,7 @@ func TestSidecarInjectorPatcher_PatchPodCreate(t *testing.T) {
 				namespace: "test",
 				pod: v1.Pod{ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"sidecar-injector.expedia.com/inject": "non-sidecar",
+						"sidecar-injector.suisrc.com/inject": "non-sidecar",
 					},
 				}},
 			},
@@ -75,7 +75,7 @@ func TestSidecarInjectorPatcher_PatchPodCreate(t *testing.T) {
 			name: "pod with sidecar annotations sidecar with no data",
 			fields: fields{
 				K8sClient:      fake.NewSimpleClientset(),
-				InjectPrefix:   "sidecar-injector.expedia.com",
+				InjectPrefix:   "sidecar-injector.suisrc.com",
 				InjectName:     "inject",
 				SidecarDataKey: "sidecars.yaml",
 			},
@@ -83,7 +83,7 @@ func TestSidecarInjectorPatcher_PatchPodCreate(t *testing.T) {
 				namespace: "test",
 				pod: v1.Pod{ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"sidecar-injector.expedia.com/inject": "my-sidecar",
+						"sidecar-injector.suisrc.com/inject": "my-sidecar",
 					},
 				}},
 			},
@@ -97,7 +97,7 @@ func TestSidecarInjectorPatcher_PatchPodCreate(t *testing.T) {
 			name: "pod with sidecar annotations sidecar with missing sidecar data key",
 			fields: fields{
 				K8sClient:      fake.NewSimpleClientset(),
-				InjectPrefix:   "sidecar-injector.expedia.com",
+				InjectPrefix:   "sidecar-injector.suisrc.com",
 				InjectName:     "inject",
 				SidecarDataKey: "sidecars.yaml",
 			},
@@ -105,7 +105,7 @@ func TestSidecarInjectorPatcher_PatchPodCreate(t *testing.T) {
 				namespace: "test",
 				pod: v1.Pod{ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"sidecar-injector.expedia.com/inject": "my-sidecar",
+						"sidecar-injector.suisrc.com/inject": "my-sidecar",
 					},
 				}},
 			},
@@ -122,7 +122,7 @@ func TestSidecarInjectorPatcher_PatchPodCreate(t *testing.T) {
 			name: "pod with sidecar annotations sidecar with sidecar data key but data empty",
 			fields: fields{
 				K8sClient:      fake.NewSimpleClientset(),
-				InjectPrefix:   "sidecar-injector.expedia.com",
+				InjectPrefix:   "sidecar-injector.suisrc.com",
 				InjectName:     "inject",
 				SidecarDataKey: "sidecars.yaml",
 			},
@@ -130,7 +130,7 @@ func TestSidecarInjectorPatcher_PatchPodCreate(t *testing.T) {
 				namespace: "test",
 				pod: v1.Pod{ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"sidecar-injector.expedia.com/inject": "my-sidecar",
+						"sidecar-injector.suisrc.com/inject": "my-sidecar",
 					},
 				}},
 			},
@@ -147,7 +147,7 @@ func TestSidecarInjectorPatcher_PatchPodCreate(t *testing.T) {
 			name: "pod with sidecar annotations sidecar with sidecar data key but data empty",
 			fields: fields{
 				K8sClient:      fake.NewSimpleClientset(),
-				InjectPrefix:   "sidecar-injector.expedia.com",
+				InjectPrefix:   "sidecar-injector.suisrc.com",
 				InjectName:     "inject",
 				SidecarDataKey: "sidecars.yaml",
 			},
@@ -155,7 +155,7 @@ func TestSidecarInjectorPatcher_PatchPodCreate(t *testing.T) {
 				namespace: "test",
 				pod: v1.Pod{ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"sidecar-injector.expedia.com/inject": "my-sidecar",
+						"sidecar-injector.suisrc.com/inject": "my-sidecar",
 					},
 				}},
 			},
@@ -328,7 +328,7 @@ func TestSidecarInjectorPatcher_configmapSidecarNames(t *testing.T) {
 			},
 			fields: fields{
 				K8sClient:    fake.NewSimpleClientset(),
-				InjectPrefix: "sidecar-injector.expedia.com",
+				InjectPrefix: "sidecar-injector.suisrc.com",
 				InjectName:   "inject",
 			},
 			want: nil,
@@ -345,7 +345,7 @@ func TestSidecarInjectorPatcher_configmapSidecarNames(t *testing.T) {
 			},
 			fields: fields{
 				K8sClient:    fake.NewSimpleClientset(),
-				InjectPrefix: "sidecar-injector.expedia.com",
+				InjectPrefix: "sidecar-injector.suisrc.com",
 				InjectName:   "inject",
 			},
 			want: nil,
@@ -356,13 +356,13 @@ func TestSidecarInjectorPatcher_configmapSidecarNames(t *testing.T) {
 				namespace: "test",
 				pod: v1.Pod{ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"sidecar-injector.expedia.com/inject": "my-sidecar",
+						"sidecar-injector.suisrc.com/inject": "my-sidecar",
 					},
 				}},
 			},
 			fields: fields{
 				K8sClient:    fake.NewSimpleClientset(),
-				InjectPrefix: "sidecar-injector.expedia.com",
+				InjectPrefix: "sidecar-injector.suisrc.com",
 				InjectName:   "inject",
 			},
 			want: []string{"my-sidecar"},
@@ -373,13 +373,13 @@ func TestSidecarInjectorPatcher_configmapSidecarNames(t *testing.T) {
 				namespace: "test",
 				pod: v1.Pod{ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"sidecar-injector.expedia.com/inject": "my-sidecar,my-sidecar2",
+						"sidecar-injector.suisrc.com/inject": "my-sidecar,my-sidecar2",
 					},
 				}},
 			},
 			fields: fields{
 				K8sClient:    fake.NewSimpleClientset(),
-				InjectPrefix: "sidecar-injector.expedia.com",
+				InjectPrefix: "sidecar-injector.suisrc.com",
 				InjectName:   "inject",
 			},
 			want: []string{"my-sidecar", "my-sidecar2"},
@@ -416,10 +416,10 @@ func TestSidecarInjectorPatcher_sideCarInjectionAnnotation(t *testing.T) {
 			name: "sidecar injection annotation properly constructed",
 			fields: fields{
 				K8sClient:    fake.NewSimpleClientset(),
-				InjectPrefix: "sidecar-injector.expedia.com",
+				InjectPrefix: "sidecar-injector.suisrc.com",
 				InjectName:   "inject",
 			},
-			want: "sidecar-injector.expedia.com/inject",
+			want: "sidecar-injector.suisrc.com/inject",
 		},
 	}
 	for _, tt := range tests {

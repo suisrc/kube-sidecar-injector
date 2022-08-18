@@ -1,11 +1,11 @@
-![helm-release-gha](https://github.com/ExpediaGroup/kubernetes-sidecar-injector/actions/workflows/helm_release.yaml/badge.svg?branch=main)
+![helm-release-gha](https://github.com/suisrc/kube-sidecar-injector/actions/workflows/helm_release.yaml/badge.svg?branch=main)
 [![semantic-release: conventionalcommits](https://img.shields.io/badge/semantic--release-conventionalcommits-e10079?logo=semantic-release)](https://github.com/semantic-release/semantic-release)
-[![License](https://img.shields.io/badge/license-Apache%20License%202.0-blue.svg)](https://github.com/ExpediaGroup/kubernetes-sidecar-injector/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%20License%202.0-blue.svg)](https://github.com/suisrc/kube-sidecar-injector/blob/main/LICENSE)
 
 Kubernetes Mutating Webhook
 ===========
 
-https://hub.docker.com/r/expediagroup/kubernetes-sidecar-injector
+https://hub.docker.com/r/suisrc/kube-sidecar-injector
 
 This [mutating webhook](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#mutatingadmissionwebhook) was developed to inject sidecars to a Kubernetes pod. 
 
@@ -53,9 +53,9 @@ data:
 make helm-install
 ```
 
-2. By default, all namespaces are watched except `kube-system` and `kube-public`. This can be configured in your [helm values](charts/kubernetes-sidecar-injector/values.yaml#L13-L19).
+2. By default, all namespaces are watched except `kube-system` and `kube-public`. This can be configured in your [helm values](charts/kube-sidecar-injector/values.yaml#L13-L19).
 
-3. Add the annotation ([`sidecar-injector.expedia.com/inject`](charts/kubernetes-sidecar-injector/values.yaml#L9-L10) by default) with ConfigMap sidecar name to inject in pod spec where sidecar needs to be injected. [This sample spec](sample/chart/echo-server/templates/deployment.yaml#L16) shows such an annotation added to a pod spec to inject `haystack-agent`.
+3. Add the annotation ([`sidecar-injector.suisrc.com/inject`](charts/kube-sidecar-injector/values.yaml#L9-L10) by default) with ConfigMap sidecar name to inject in pod spec where sidecar needs to be injected. [This sample spec](sample/chart/echo-server/templates/deployment.yaml#L16) shows such an annotation added to a pod spec to inject `haystack-agent`.
 
 4. Create your ConfigMap sidecar configuration
 
@@ -77,12 +77,12 @@ data:
             - name: workdir
               mountPath: "/work-dir"
 ```
-## How to use the kubernetes-sidecar-injector Helm repository
+## How to use the kube-sidecar-injector Helm repository
 
 You need to add this repository to your Helm repositories:
 
 ```
-helm repo add kubernetes-sidecar-injector  https://opensource.expediagroup.com/kubernetes-sidecar-injector/
+helm repo add kube-sidecar-injector  https://opensource.expediagroup.com/kube-sidecar-injector/
 helm repo update
 ```
 
@@ -92,3 +92,6 @@ make kind
 make install-sample-init-container # or make install-sample-container
 make follow-logs
 ```
+
+## 鸣谢
+[ExpediaGroup](https://github.com/ExpediaGroup/kubernetes-sidecar-injector)

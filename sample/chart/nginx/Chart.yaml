@@ -1,5 +1,5 @@
 name: inject-init-container
-home: https://github.com/expediagroup/kubernetes-sidecar-injector
+home: https://github.com/suisrc/kube-sidecar-injector
 version: 0.0.1
 appVersion: "0.1"
 apiVersion:

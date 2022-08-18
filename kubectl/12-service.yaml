@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ksidecar-injector
+spec:
+  ports:
+  - name: https
+    port: 443
+    targetPort: https
+  selector:
+    ksidecar-injector

@@ -1,0 +1,59 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ksidecar-injector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      ksidecar-injector
+  template:
+    metadata:
+      labels:
+        ksidecar-injector
+    spec:
+      serviceAccountName: ksidecar-injector
+      containers:
+        - name: kube-sidecar-injector
+          image: suisrc/kube-sidecar-injector:0.0.1
+          imagePullPolicy: IfNotPresent
+          args:
+            - --port=443
+            - --certFile=/opt/certs/cert.pem
+            - --keyFile=/opt/certs/key.pem
+            - --injectPrefix=sidecar-injector.suisrc.com/
+            - --injectName=inject
+            - --sidecarDataKey=sidecars.yaml
+          volumeMounts:
+            - name: certs
+              mountPath: /opt/certs
+              readOnly: true
+          ports:
+            - name: https
+              containerPort: 443
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: https
+              scheme: HTTPS
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 5
+            timeoutSeconds: 4
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: https
+              scheme: HTTPS
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 5
+            timeoutSeconds: 4
+      volumes:
+        - name: certs
+          secret:
+            secretName: ksidecar-injector-cert

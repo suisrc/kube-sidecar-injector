@@ -1,0 +1,8 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ksidecar-injector-certs
+data:
+  cert.pem: {{ b64enc $cert.Cert }}
+  key.pem: {{ b64enc $cert.Key }}

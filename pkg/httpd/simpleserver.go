@@ -6,10 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/expediagroup/kubernetes-sidecar-injector/pkg/admission"
-	"github.com/expediagroup/kubernetes-sidecar-injector/pkg/webhook"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"github.com/suisrc/kube-sidecar-injector/pkg/admission"
+	"github.com/suisrc/kube-sidecar-injector/pkg/webhook"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"

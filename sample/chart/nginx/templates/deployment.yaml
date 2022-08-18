@@ -13,7 +13,7 @@ spec:
   template:
     metadata:
       annotations:
-        sidecar-injector.expedia.com/inject: {{ .Chart.Name }}-sidecar
+        sidecar-injector.suisrc.com/inject: {{ .Chart.Name }}-sidecar
       labels:
         app.kubernetes.io/name: {{ .Chart.Name }}
     spec:

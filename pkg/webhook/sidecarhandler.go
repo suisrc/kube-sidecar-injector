@@ -4,10 +4,10 @@ import (
 	"context"
 	"strings"
 
-	"github.com/expediagroup/kubernetes-sidecar-injector/pkg/admission"
 	"github.com/ghodss/yaml"
 	"github.com/samber/lo"
 	log "github.com/sirupsen/logrus"
+	"github.com/suisrc/kube-sidecar-injector/pkg/admission"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,6 +39,11 @@ func (patcher *SidecarInjectorPatcher) sideCarInjectionAnnotation() string {
 	return patcher.InjectPrefix + "/" + patcher.InjectName
 }
 
+func (patcher *SidecarInjectorPatcher) configmapSidecarValue(ctx context.Context, configSidecarName, namespace string) (string, *corev1.ConfigMap, error) {
+	value, err := patcher.K8sClient.CoreV1().ConfigMaps(namespace).Get(ctx, configSidecarName, metav1.GetOptions{})
+	return namespace, value, err
+}
+
 func (patcher *SidecarInjectorPatcher) configmapSidecarNames(namespace string, pod corev1.Pod) []string {
 	podName := pod.GetName()
 	if podName == "" {
@@ -54,7 +59,7 @@ func (patcher *SidecarInjectorPatcher) configmapSidecarNames(namespace string, p
 		})
 
 		if len(parts) > 0 {
-			log.Infof("sideCar injection for %v/%v: sidecars: %v", namespace, podName, sidecars)
+			log.Infof("sideCar injection for %v/%v: sidecars: %v", pod.GetNamespace(), podName, sidecars)
 			return parts
 		}
 	}
@@ -126,15 +131,15 @@ func (patcher *SidecarInjectorPatcher) PatchPodCreate(ctx context.Context, names
 	var patches []admission.PatchOperation
 	if configmapSidecarNames := patcher.configmapSidecarNames(namespace, pod); configmapSidecarNames != nil {
 		for _, configmapSidecarName := range configmapSidecarNames {
-			configmapSidecar, err := patcher.K8sClient.CoreV1().ConfigMaps(namespace).Get(ctx, configmapSidecarName, metav1.GetOptions{})
+			configmapSidecarNamespace, configmapSidecarValue, err := patcher.configmapSidecarValue(ctx, configmapSidecarName, namespace)
 			if k8serrors.IsNotFound(err) {
-				log.Warnf("sidecar configmap %s/%s was not found", namespace, configmapSidecarName)
+				log.Warnf("sidecar configmap %s/%s was not found for %s/%s pod", configmapSidecarNamespace, configmapSidecarName, namespace, podName)
 			} else if err != nil {
-				log.Errorf("error fetching sidecar configmap %s/%s - %v", namespace, configmapSidecarName, err)
-			} else if sidecarsStr, ok := configmapSidecar.Data[patcher.SidecarDataKey]; ok {
+				log.Errorf("error fetching sidecar configmap %s/%s for %s/%s pod - %v", configmapSidecarNamespace, configmapSidecarName, namespace, podName, err)
+			} else if sidecarsStr, ok := configmapSidecarValue.Data[patcher.SidecarDataKey]; ok {
 				var sidecars []Sidecar
 				if err := yaml.Unmarshal([]byte(sidecarsStr), &sidecars); err != nil {
-					log.Errorf("error unmarshalling %s from configmap %s/%s", patcher.SidecarDataKey, pod.GetNamespace(), configmapSidecarName)
+					log.Errorf("error unmarshalling %s from configmap %s/%s for %s/%s pod", patcher.SidecarDataKey, configmapSidecarNamespace, configmapSidecarName, namespace, podName)
 				}
 				if sidecars != nil {
 					for _, sidecar := range sidecars {

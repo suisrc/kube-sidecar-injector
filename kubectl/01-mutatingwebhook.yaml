@@ -1,0 +1,45 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: ksidecar-injector
+webhooks:
+  - name: sidecar-injector.suisrc.com
+    clientConfig:
+      service:
+        name: ksidecar-injector
+        namespace: kube-ksidecar
+        path: "/mutate"
+      caBundle: {{ b64enc $ca.Cert }}
+    failurePolicy: Fail
+    sideEffects: None
+    admissionReviewVersions:
+      - v1
+    rules:
+      - apiGroups:
+          - ""
+        resources:
+          - pods
+        apiVersions:
+          - "*"
+        operations:
+          - CREATE
+        scope: Namespaced
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - kube-system
+            - kube-public
+            - ksidecar-injector
+        - key: sidecar-injector.suisrc.com/inject
+          operator: In
+          values:
+            - "enable"
+            - "true"
+    objectSelector:
+      matchExpressions:
+        - key: sidecar-injector.suisrc.com/inject
+          operator: Exists
+

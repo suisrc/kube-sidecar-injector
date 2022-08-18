@@ -1,5 +1,5 @@
 image:
-  repository: expediagroup/kubernetes-sidecar-injector
+  repository: suisrc/kube-sidecar-injector
   tag: latest
   pullPolicy: IfNotPresent
   pullSecrets: []
@@ -20,7 +20,7 @@ sidecars:
   dataKey: sidecars.yaml
 
 selectors:
-  injectPrefix: sidecar-injector.expedia.com
+  injectPrefix: sidecar-injector.suisrc.com
   injectName: inject
   disableInjectLabel: disable-inject
   objectSelector: {}

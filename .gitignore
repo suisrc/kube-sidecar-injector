@@ -3,8 +3,8 @@
 *.iml
 *.ipr
 *.iws
-kubernetes-sidecar-injector
-!charts/kubernetes-sidecar-injector
+kube-sidecar-injector
+!charts/kube-sidecar-injector
 generated-*.yaml
 
 Gopkg.lock

@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-CONTAINER_NAME=expediagroup/kubernetes-sidecar-injector
+CONTAINER_NAME=suisrc/kube-sidecar-injector
 IMAGE_TAG?=$(shell git rev-parse HEAD)
 KIND_REPO?="kindest/node"
 KUBE_VERSION = v1.21.12
@@ -26,10 +26,10 @@ clean:
 	go clean
 
 build: clean vet lint
-	go build -o kubernetes-sidecar-injector
+	go build -o kube-sidecar-injector
 
 release: clean vet lint
-	CGO_ENABLED=0 GOOS=linux go build -o kubernetes-sidecar-injector
+	CGO_ENABLED=0 GOOS=linux go build -o kube-sidecar-injector
 
 docker:
 	docker build --no-cache -t ${CONTAINER_NAME}:${IMAGE_TAG} .
@@ -38,10 +38,10 @@ kind-load: docker
 	kind load docker-image ${CONTAINER_NAME}:${IMAGE_TAG} --name ${KIND_CLUSTER}
 
 helm-install:
-	helm upgrade -i kubernetes-sidecar-injector ./charts/kubernetes-sidecar-injector/. --namespace=sidecar-injector --create-namespace --set image.tag=${IMAGE_TAG}
+	helm upgrade -i kube-sidecar-injector ./charts/kube-sidecar-injector/. --namespace=sidecar-injector --create-namespace --set image.tag=${IMAGE_TAG}
 
 helm-template:
-	helm template kubernetes-sidecar-injector ./charts/kubernetes-sidecar-injector
+	helm template kube-sidecar-injector ./charts/kube-sidecar-injector
 
 kind-create:
 	-kind create cluster --image "${KIND_REPO}:${KUBE_VERSION}" --name ${KIND_CLUSTER}
@@ -51,7 +51,7 @@ kind-install: kind-load helm-install
 kind: kind-create kind-install
 
 follow-logs:
-	kubectl logs -n sidecar-injector deployment/kubernetes-sidecar-injector --follow
+	kubectl logs -n sidecar-injector deployment/kube-sidecar-injector --follow
 
 install-sample-container:
 	helm upgrade -i inject-container ./sample/chart/echo-server/. --namespace=sample --create-namespace

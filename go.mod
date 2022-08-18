@@ -1,4 +1,4 @@
-module github.com/expediagroup/kubernetes-sidecar-injector
+module github.com/suisrc/kube-sidecar-injector
 
 // Make sure you change the Dockerfile
 go 1.18
