@@ -1,10 +1,10 @@
-FROM golang:1.18 as build
+FROM golang:1.18-bullseye as build
 RUN go install golang.org/x/lint/golint@latest
 WORKDIR /build
 COPY . ./
 RUN make release
 
-FROM scratch
+FROM debian:bullseye-slim
 WORKDIR /
 COPY --from=build /build/kube-sidecar-injector /
 
