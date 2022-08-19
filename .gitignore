@@ -9,3 +9,5 @@ generated-*.yaml
 
 Gopkg.lock
 /vendor/
+
+tmp/

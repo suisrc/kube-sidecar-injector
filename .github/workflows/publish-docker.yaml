@@ -6,13 +6,13 @@ on:
 
 env:
   DOCKER_IMAGE_NAME: suisrc/sidecar-injector
-  DOCKER_VERSION: '0.0.1'
+  DOCKER_VERSION: '0.0.2'
 
   QUAY_REGISTRY: quay.io
   DOCKER_REGISTRY: docker.io
 
 jobs:
-  build-openresty:
+  build-sidecar:
     runs-on: ubuntu-latest
 
     steps:

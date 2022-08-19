@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/ghodss/yaml"
@@ -39,9 +40,33 @@ func (patcher *SidecarInjectorPatcher) sideCarInjectionAnnotation() string {
 	return patcher.InjectPrefix + "/" + patcher.InjectName
 }
 
-func (patcher *SidecarInjectorPatcher) configmapSidecarValue(ctx context.Context, configSidecarName, namespace string) (string, *corev1.ConfigMap, error) {
-	value, err := patcher.K8sClient.CoreV1().ConfigMaps(namespace).Get(ctx, configSidecarName, metav1.GetOptions{})
-	return namespace, value, err
+//==================================================================================================================================================================
+
+func (patcher *SidecarInjectorPatcher) configmapSidecarData(ctx context.Context, configSidecarNamespace, configSidecarName string) (string, []Sidecar, error) {
+	namespace := configSidecarNamespace // namespace of the configmap
+	configKey := patcher.SidecarDataKey // key of the configmap
+	configName := configSidecarName
+	if idx := strings.IndexRune(configName, '/'); idx > 0 {
+		namespace = configName[:idx]
+		configName = configName[idx+1:]
+	}
+	if idx := strings.IndexRune(configName, '#'); idx > 0 {
+		configKey = configName[idx+1:]
+		configName = configName[:idx]
+	}
+	configMap, err := patcher.K8sClient.CoreV1().ConfigMaps(namespace).Get(ctx, configName, metav1.GetOptions{})
+	if err != nil {
+		return namespace, []Sidecar{}, err
+	}
+	if sidecarsStr, ok := configMap.Data[configKey]; !ok {
+		return namespace, []Sidecar{}, fmt.Errorf("configmap %v does not contain key %v", configName, configKey)
+	} else {
+		sidecars := []Sidecar{}
+		if err := yaml.Unmarshal([]byte(sidecarsStr), &sidecars); err != nil {
+			return namespace, nil, fmt.Errorf("failed to parse configmap %v key %v: %v", configName, configKey, err)
+		}
+		return namespace, sidecars, nil
+	}
 }
 
 func (patcher *SidecarInjectorPatcher) configmapSidecarNames(namespace string, pod corev1.Pod) []string {
@@ -54,18 +79,57 @@ func (patcher *SidecarInjectorPatcher) configmapSidecarNames(namespace string, p
 		annotations = pod.GetAnnotations()
 	}
 	if sidecars, ok := annotations[patcher.sideCarInjectionAnnotation()]; ok {
-		parts := lo.Map[string, string](strings.Split(sidecars, ","), func(part string, _ int) string {
+		parts := lo.Map(strings.Split(sidecars, ","), func(part string, _ int) string { // Map[string, string]
 			return strings.TrimSpace(part)
 		})
 
 		if len(parts) > 0 {
-			log.Infof("sideCar injection for %v/%v: sidecars: %v", pod.GetNamespace(), podName, sidecars)
+			log.Infof("sideCar injection for %v/%v: sidecars: %v", namespace, podName, sidecars)
 			return parts
 		}
 	}
-	log.Infof("Skipping mutation for [%v]. No action required", pod.GetName())
+	log.Infof("Skipping mutation for [%v]. No action required", podName)
 	return nil
 }
+
+//==================================================================================================================================================================
+
+func (patcher *SidecarInjectorPatcher) fixSidecarByPodAnnotations(sidecar *Sidecar, annotations map[string]string) {
+	if (annotations == nil) || (len(annotations) == 0) {
+		return
+	}
+	envPrefixKey := patcher.InjectPrefix + "/env."
+	for envName, envValue := range annotations {
+		if strings.HasPrefix(envName, envPrefixKey) {
+			envName = envName[len(envPrefixKey):]
+			for idx := range sidecar.InitContainers {
+				patcher.fixSidecarContainerEnvValue(&sidecar.Containers[idx], envName, envValue)
+			}
+			for idx := range sidecar.Containers {
+				patcher.fixSidecarContainerEnvValue(&sidecar.Containers[idx], envName, envValue)
+			}
+		}
+	}
+}
+
+func (patcher *SidecarInjectorPatcher) fixSidecarContainerEnvValue(container *corev1.Container, envName, envValue string) {
+	edx := -1
+	for jdx := range container.Env {
+		if container.Env[jdx].Name == envName {
+			edx = jdx
+			break
+		}
+	}
+	if edx >= 0 {
+		// update existing env value
+		container.Env[edx].Value = envValue
+	} else {
+		// add new env value
+		container.Env = append(container.Env, corev1.EnvVar{Name: envName, Value: envValue})
+	}
+}
+
+//==================================================================================================================================================================
 
 func createArrayPatches[T any](newCollection []T, existingCollection []T, path string) []admission.PatchOperation {
 	var patches []admission.PatchOperation
@@ -122,6 +186,8 @@ func escapeJSONPath(k string) string {
 	return strings.ReplaceAll(k, "/", "~1")
 }
 
+//==================================================================================================================================================================
+
 // PatchPodCreate Handle Pod Create Patch
 func (patcher *SidecarInjectorPatcher) PatchPodCreate(ctx context.Context, namespace string, pod corev1.Pod) ([]admission.PatchOperation, error) {
 	podName := pod.GetName()
@@ -131,27 +197,22 @@ func (patcher *SidecarInjectorPatcher) PatchPodCreate(ctx context.Context, names
 	var patches []admission.PatchOperation
 	if configmapSidecarNames := patcher.configmapSidecarNames(namespace, pod); configmapSidecarNames != nil {
 		for _, configmapSidecarName := range configmapSidecarNames {
-			configmapSidecarNamespace, configmapSidecarValue, err := patcher.configmapSidecarValue(ctx, configmapSidecarName, namespace)
+			configmapSidecarNamespace, configmapSidecars, err := patcher.configmapSidecarData(ctx, namespace, configmapSidecarName)
 			if k8serrors.IsNotFound(err) {
-				log.Warnf("sidecar configmap %s/%s was not found for %s/%s pod", configmapSidecarNamespace, configmapSidecarName, namespace, podName)
+				log.Warnf("sidecar configmap %s -> %s was not found for %s/%s pod", configmapSidecarNamespace, configmapSidecarName, namespace, podName)
 			} else if err != nil {
-				log.Errorf("error fetching sidecar configmap %s/%s for %s/%s pod - %v", configmapSidecarNamespace, configmapSidecarName, namespace, podName, err)
-			} else if sidecarsStr, ok := configmapSidecarValue.Data[patcher.SidecarDataKey]; ok {
-				var sidecars []Sidecar
-				if err := yaml.Unmarshal([]byte(sidecarsStr), &sidecars); err != nil {
-					log.Errorf("error unmarshalling %s from configmap %s/%s for %s/%s pod", patcher.SidecarDataKey, configmapSidecarNamespace, configmapSidecarName, namespace, podName)
+				log.Errorf("error fetching sidecar configmap %s -> %s for %s/%s pod - %v", configmapSidecarNamespace, configmapSidecarName, namespace, podName, err)
+			} else if configmapSidecars != nil {
+				for _, sidecar := range configmapSidecars {
+					patcher.fixSidecarByPodAnnotations(&sidecar, pod.GetAnnotations()) // fix sidecar by pod annotations
+					patches = append(patches, createArrayPatches(sidecar.InitContainers, pod.Spec.InitContainers, "/spec/initContainers")...)
+					patches = append(patches, createArrayPatches(sidecar.Containers, pod.Spec.Containers, "/spec/containers")...)
+					patches = append(patches, createArrayPatches(sidecar.Volumes, pod.Spec.Volumes, "/spec/volumes")...)
+					patches = append(patches, createArrayPatches(sidecar.ImagePullSecrets, pod.Spec.ImagePullSecrets, "/spec/imagePullSecrets")...)
+					patches = append(patches, createObjectPatches(sidecar.Annotations, pod.Annotations, "/metadata/annotations", patcher.AllowAnnotationOverrides)...)
+					patches = append(patches, createObjectPatches(sidecar.Labels, pod.Labels, "/metadata/labels", patcher.AllowLabelOverrides)...)
 				}
-				if sidecars != nil {
-					for _, sidecar := range sidecars {
-						patches = append(patches, createArrayPatches(sidecar.InitContainers, pod.Spec.InitContainers, "/spec/initContainers")...)
-						patches = append(patches, createArrayPatches(sidecar.Containers, pod.Spec.Containers, "/spec/containers")...)
-						patches = append(patches, createArrayPatches(sidecar.Volumes, pod.Spec.Volumes, "/spec/volumes")...)
-						patches = append(patches, createArrayPatches(sidecar.ImagePullSecrets, pod.Spec.ImagePullSecrets, "/spec/imagePullSecrets")...)
-						patches = append(patches, createObjectPatches(sidecar.Annotations, pod.Annotations, "/metadata/annotations", patcher.AllowAnnotationOverrides)...)
-						patches = append(patches, createObjectPatches(sidecar.Labels, pod.Labels, "/metadata/labels", patcher.AllowLabelOverrides)...)
-					}
-					log.Debugf("sidecar patches being applied for %v/%v: patches: %v", namespace, podName, patches)
-				}
+				log.Debugf("sidecar patches being applied for %v/%v: patches: %v", namespace, podName, patches)
 			}
 		}
 	}
