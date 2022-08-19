@@ -1,3 +1,4 @@
+# kubectl apply -f 13-deployment.yaml -n kube-ksidecar
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -7,23 +8,23 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      ksidecar-injector
+      app: ksidecar-injector
   template:
     metadata:
       labels:
-        ksidecar-injector
+        app: ksidecar-injector
     spec:
       serviceAccountName: ksidecar-injector
       containers:
         - name: kube-sidecar-injector
-          image: suisrc/kube-sidecar-injector:0.0.1
+          image: suisrc/sidecar-injector:0.0.2
           imagePullPolicy: IfNotPresent
           args:
             - --port=443
             - --certFile=/opt/certs/cert.pem
             - --keyFile=/opt/certs/key.pem
-            - --injectPrefix=sidecar-injector.suisrc.com/
-            - --injectName=inject
+            - --injectPrefix=ksidecar
+            - --injectName=configmap
             - --sidecarDataKey=sidecars.yaml
           volumeMounts:
             - name: certs
@@ -48,7 +49,7 @@ spec:
               path: /healthz
               port: https
               scheme: HTTPS
-            initialDelaySeconds: 30
+            initialDelaySeconds: 10
             periodSeconds: 10
             successThreshold: 1
             failureThreshold: 5
@@ -56,4 +57,4 @@ spec:
       volumes:
         - name: certs
           secret:
-            secretName: ksidecar-injector-cert
+            secretName: ksidecar-injector-certs

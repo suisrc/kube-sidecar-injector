@@ -3,6 +3,10 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: ksidecar-injector-certs
-data:
-  cert.pem: {{ b64enc $cert.Cert }}
-  key.pem: {{ b64enc $cert.Key }}
+stringData:
+  ca.pem: |-
+    <PEM..., 根证书,k8s调用时,使用>
+  cert.pem: |-
+    <PEM..., ksidecar-injector.kube-ksidecar.svc证书>
+  key.pem: |-
+    <PEM..., ksidecar-injector.kube-ksidecar.svc密钥>
