@@ -1,11 +1,11 @@
 # kubectl create ns sidecar-injector
 # kubectl apply -k .
 
-{{- $caPrefix := printf "%s-ca" ksidecar-injector }}
-{{- $ca := genCA $caPrefix 3650 }}
-{{- $cn := ksidecar-injector }}
-{{- $altName1 := printf "%s.%s.svc" ksidecar-injector.kube-ksidecar }}
-{{- $cert := genSignedCert $cn nil (list $altName1) 3650 $ca }}
+# {{- $caPrefix := printf "%s-ca" ksidecar-injector }}
+# {{- $ca := genCA $caPrefix 3650 }}
+# {{- $cn := ksidecar-injector }}
+# {{- $altName1 := printf "%s.%s.svc" ksidecar-injector.kube-ksidecar }}
+# {{- $cert := genSignedCert $cn nil (list $altName1) 3650 $ca }}
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: kube-ksidecar
