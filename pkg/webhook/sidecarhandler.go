@@ -135,7 +135,7 @@ func (patcher *SidecarInjectorPatcher) fixSidecarContainerEnvValue(container *co
 func createContainersPatches(newContainers []corev1.Container, existingContainers []corev1.Container, path string) []admission.PatchOperation {
 	if len(existingContainers) == 0 {
 		// pass merge patch if no existing containers
-		return createContainersPatches(newContainers, existingContainers, path)
+		return createArrayPatches(newContainers, existingContainers, path)
 	}
 	// merge existing and new containers
 	var patches []admission.PatchOperation
