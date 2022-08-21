@@ -3,6 +3,8 @@ package webhook
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/ghodss/yaml"
@@ -17,7 +19,6 @@ import (
 
 // Sidecar Kubernetes Sidecar Injector schema
 type Sidecar struct {
-	Name             string                        `yaml:"name"`
 	InitContainers   []corev1.Container            `yaml:"initContainers"`
 	Containers       []corev1.Container            `yaml:"containers"`
 	Volumes          []corev1.Volume               `yaml:"volumes"`
@@ -42,7 +43,7 @@ func (patcher *SidecarInjectorPatcher) sideCarInjectionAnnotation() string {
 
 //==================================================================================================================================================================
 
-func (patcher *SidecarInjectorPatcher) configmapSidecarData(ctx context.Context, configSidecarNamespace, configSidecarName string) ([]Sidecar, error) {
+func (patcher *SidecarInjectorPatcher) configmapSidecarData(ctx context.Context, configSidecarNamespace, configSidecarName string, pod corev1.Pod) (*Sidecar, error) {
 	namespace := configSidecarNamespace // namespace of the configmap
 	configKey := patcher.SidecarDataKey // key of the configmap
 	configName := configSidecarName
@@ -58,14 +59,29 @@ func (patcher *SidecarInjectorPatcher) configmapSidecarData(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	if sidecarsStr, ok := configMap.Data[configKey]; !ok {
+	if sidecarStr, ok := configMap.Data[configKey]; !ok {
 		return nil, fmt.Errorf("configmap %v does not contain key %v", configName, configKey)
 	} else {
-		sidecars := []Sidecar{}
-		if err := yaml.Unmarshal([]byte(sidecarsStr), &sidecars); err != nil {
+		sidecar := &Sidecar{}
+		if err := yaml.Unmarshal([]byte(sidecarStr), sidecar); err != nil {
 			return nil, fmt.Errorf("failed to parse configmap %v key %v: %v", configName, configKey, err)
 		}
-		return sidecars, nil
+		matchExistPod, _ := regexp.Compile(`^\[\d+\]$`)
+		for i := 0; i < len(sidecar.Containers); {
+			if !matchExistPod.MatchString(sidecar.Containers[i].Name) {
+				i++ // skip non-exist pod container
+				continue
+			}
+			idx, _ := strconv.Atoi(sidecar.Containers[i].Name[1 : len(sidecar.Containers[i].Name)-1])
+			if idx < 0 || idx >= len(pod.Spec.Containers) {
+				// skip non-exist pod container
+				sidecar.Containers = append(sidecar.Containers[:i], sidecar.Containers[i+1:]...)
+			} else {
+				sidecar.Containers[i].Name = pod.Spec.Containers[idx].Name
+				i++ // replace container name
+			}
+		}
+		return sidecar, nil
 	}
 }
 
@@ -197,25 +213,23 @@ func (patcher *SidecarInjectorPatcher) PatchPodCreate(ctx context.Context, names
 	var patches []admission.PatchOperation
 	if configmapSidecarNames := patcher.configmapSidecarNames(namespace, pod); configmapSidecarNames != nil {
 		for _, configmapSidecarName := range configmapSidecarNames {
-			configmapSidecars, err := patcher.configmapSidecarData(ctx, namespace, configmapSidecarName)
+			configmapSidecar, err := patcher.configmapSidecarData(ctx, namespace, configmapSidecarName, pod)
 			if k8serrors.IsNotFound(err) {
 				log.Warnf("sidecar configmap %s -> %s was not found for %s/%s pod", namespace, configmapSidecarName, namespace, podName)
 			} else if err != nil {
 				log.Errorf("error fetching sidecar configmap %s -> %s for %s/%s pod - %v", namespace, configmapSidecarName, namespace, podName, err)
-			} else if configmapSidecars != nil {
-				for _, sidecar := range configmapSidecars {
-					patcher.fixSidecarByPodAnnotations(&sidecar, pod.GetAnnotations()) // fix sidecar by pod annotations
-					patches = append(patches, createArrayPatches(sidecar.InitContainers, pod.Spec.InitContainers, "/spec/initContainers")...)
-					patches = append(patches, createArrayPatches(sidecar.Containers, pod.Spec.Containers, "/spec/containers")...)
-					patches = append(patches, createArrayPatches(sidecar.Volumes, pod.Spec.Volumes, "/spec/volumes")...)
-					patches = append(patches, createArrayPatches(sidecar.ImagePullSecrets, pod.Spec.ImagePullSecrets, "/spec/imagePullSecrets")...)
-					patches = append(patches, createObjectPatches(sidecar.Annotations, pod.Annotations, "/metadata/annotations", patcher.AllowAnnotationOverrides)...)
-					patches = append(patches, createObjectPatches(sidecar.Labels, pod.Labels, "/metadata/labels", patcher.AllowLabelOverrides)...)
-				}
-				log.Debugf("sidecar patches being applied for %v/%v: patches: %v", namespace, podName, patches)
+			} else if configmapSidecar != nil {
+				patcher.fixSidecarByPodAnnotations(configmapSidecar, pod.GetAnnotations()) // fix sidecar by pod annotations
+				patches = append(patches, createArrayPatches(configmapSidecar.InitContainers, pod.Spec.InitContainers, "/spec/initContainers")...)
+				patches = append(patches, createArrayPatches(configmapSidecar.Containers, pod.Spec.Containers, "/spec/containers")...)
+				patches = append(patches, createArrayPatches(configmapSidecar.Volumes, pod.Spec.Volumes, "/spec/volumes")...)
+				patches = append(patches, createArrayPatches(configmapSidecar.ImagePullSecrets, pod.Spec.ImagePullSecrets, "/spec/imagePullSecrets")...)
+				patches = append(patches, createObjectPatches(configmapSidecar.Annotations, pod.Annotations, "/metadata/annotations", patcher.AllowAnnotationOverrides)...)
+				patches = append(patches, createObjectPatches(configmapSidecar.Labels, pod.Labels, "/metadata/labels", patcher.AllowLabelOverrides)...)
 			}
 		}
 	}
+	log.Debugf("sidecar patches being applied for %v/%v: patches: %v", namespace, podName, patches)
 	return patches, nil
 }
 

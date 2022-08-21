@@ -21,11 +21,11 @@ spec:
           imagePullPolicy: IfNotPresent
           args:
             - --port=443
-            - --certFile=/opt/certs/cert.pem
+            - --certFile=/opt/certs/crt.pem
             - --keyFile=/opt/certs/key.pem
             - --injectPrefix=ksidecar
             - --injectName=configmap
-            - --sidecarDataKey=sidecars.yaml
+            - --sidecarDataKey=sidecar.yaml
           volumeMounts:
             - name: certs
               mountPath: /opt/certs

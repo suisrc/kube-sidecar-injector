@@ -6,7 +6,7 @@ metadata:
 stringData:
   ca.pem: |-
     <PEM..., 根证书,k8s调用时,使用>
-  cert.pem: |-
+  crt.pem: |-
     <PEM..., ksidecar-injector.kube-ksidecar.svc证书>
   key.pem: |-
     <PEM..., ksidecar-injector.kube-ksidecar.svc密钥>

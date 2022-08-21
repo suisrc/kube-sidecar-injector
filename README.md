@@ -66,16 +66,15 @@ metadata:
   name: my-app-sidecar
   namespace: {{ .Release.Namespace }}
 data:
-  sidecars.yaml: |
-    - name: busybox
-      initContainers:
-        - name: busybox
-          image: busybox
-          command: [ "/bin/sh" ]
-          args: [ "-c", "echo '<html><h1>Hi!</h1><html>' >> /work-dir/index.html" ]
-          volumeMounts:
-            - name: workdir
-              mountPath: "/work-dir"
+  sidecar.yaml: |
+    initContainers:
+      - name: busybox
+        image: busybox
+        command: [ "/bin/sh" ]
+        args: [ "-c", "echo '<html><h1>Hi!</h1><html>' >> /work-dir/index.html" ]
+        volumeMounts:
+          - name: workdir
+            mountPath: "/work-dir"
 ```
 ## How to use the kube-sidecar-injector Helm repository
 
