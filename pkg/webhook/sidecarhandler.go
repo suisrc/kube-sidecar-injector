@@ -95,42 +95,42 @@ func (patcher *SidecarInjectorPatcher) configmapSidecarNames(namespace string, p
 
 //==================================================================================================================================================================
 
-func (patcher *SidecarInjectorPatcher) fixSidecarByPodAnnotations(sidecar *Sidecar, annotations map[string]string) {
-	if (annotations == nil) || (len(annotations) == 0) {
-		return
-	}
-	envPrefixKey := patcher.InjectPrefix + "/env."
-	for envName, envValue := range annotations {
-		if strings.HasPrefix(envName, envPrefixKey) {
-			envName = envName[len(envPrefixKey):]
-			for idx := range sidecar.InitContainers {
-				patcher.fixSidecarContainerEnvValue(&sidecar.Containers[idx], envName, envValue)
-			}
-			for idx := range sidecar.Containers {
-				patcher.fixSidecarContainerEnvValue(&sidecar.Containers[idx], envName, envValue)
-			}
-		}
-	}
-}
-
-func (patcher *SidecarInjectorPatcher) fixSidecarContainerEnvValue(container *corev1.Container, envName, envValue string) {
-	edx := -1
-	for jdx := range container.Env {
-		if container.Env[jdx].Name == envName {
-			edx = jdx
-			break
-		}
-	}
-	if edx >= 0 {
-		// update existing env value
-		container.Env[edx].Value = envValue
-	} else if container.Env == nil {
-		container.Env = []corev1.EnvVar{{Name: envName, Value: envValue}}
-	} else {
-		// add new env value
-		container.Env = append(container.Env, corev1.EnvVar{Name: envName, Value: envValue})
-	}
-}
+// func (patcher *SidecarInjectorPatcher) fixSidecarByPodAnnotations(sidecar *Sidecar, annotations map[string]string) {
+// 	if (annotations == nil) || (len(annotations) == 0) {
+// 		return
+// 	}
+// 	envPrefixKey := patcher.InjectPrefix + "/env."
+// 	for envName, envValue := range annotations {
+// 		if strings.HasPrefix(envName, envPrefixKey) {
+// 			envName = envName[len(envPrefixKey):]
+// 			for idx := range sidecar.InitContainers {
+// 				patcher.fixSidecarContainerEnvValue(&sidecar.Containers[idx], envName, envValue)
+// 			}
+// 			for idx := range sidecar.Containers {
+// 				patcher.fixSidecarContainerEnvValue(&sidecar.Containers[idx], envName, envValue)
+// 			}
+// 		}
+// 	}
+// }
+//
+// func (patcher *SidecarInjectorPatcher) fixSidecarContainerEnvValue(container *corev1.Container, envName, envValue string) {
+// 	edx := -1
+// 	for jdx := range container.Env {
+// 		if container.Env[jdx].Name == envName {
+// 			edx = jdx
+// 			break
+// 		}
+// 	}
+// 	if edx >= 0 {
+// 		// update existing env value
+// 		container.Env[edx].Value = envValue
+// 	} else if container.Env == nil {
+// 		container.Env = []corev1.EnvVar{{Name: envName, Value: envValue}}
+// 	} else {
+// 		// add new env value
+// 		container.Env = append(container.Env, corev1.EnvVar{Name: envName, Value: envValue})
+// 	}
+// }
 
 //==================================================================================================================================================================
 
