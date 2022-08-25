@@ -124,6 +124,8 @@ func (patcher *SidecarInjectorPatcher) fixSidecarContainerEnvValue(container *co
 	if edx >= 0 {
 		// update existing env value
 		container.Env[edx].Value = envValue
+	} else if container.Env == nil {
+		container.Env = []corev1.EnvVar{{Name: envName, Value: envValue}}
 	} else {
 		// add new env value
 		container.Env = append(container.Env, corev1.EnvVar{Name: envName, Value: envValue})
@@ -349,7 +351,7 @@ func (patcher *SidecarInjectorPatcher) PatchPodCreate(ctx context.Context, names
 			} else if err != nil {
 				log.Errorf("error fetching sidecar configmap %s -> %s for %s/%s pod - %v", namespace, configmapSidecarName, namespace, podName, err)
 			} else if configmapSidecar != nil {
-				patcher.fixSidecarByPodAnnotations(configmapSidecar, pod.GetAnnotations()) // fix sidecar by pod annotations
+				// patcher.fixSidecarByPodAnnotations(configmapSidecar, pod.GetAnnotations()) // fix sidecar by pod annotations
 				patches = append(patches, createContainersPatches(configmapSidecar.InitContainers, &pod.Spec.InitContainers, "/spec/initContainers")...)
 				patches = append(patches, createContainersPatches(configmapSidecar.Containers, &pod.Spec.Containers, "/spec/containers")...)
 				patches = append(patches, createArrayPatches(configmapSidecar.Volumes, &pod.Spec.Volumes, "/spec/volumes")...)
