@@ -489,7 +489,7 @@ func Test_createArrayPatches(t *testing.T) {
 	}
 	for _, tt := range containerTests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, createArrayPatches(tt.args.newCollection, tt.args.existingCollection, tt.args.path), "createArrayPatches(%v, %v, %v)", tt.args.newCollection, tt.args.existingCollection, tt.args.path)
+			assert.Equalf(t, tt.want, createArrayPatches(tt.args.newCollection, &tt.args.existingCollection, tt.args.path), "createArrayPatches(%v, %v, %v)", tt.args.newCollection, tt.args.existingCollection, tt.args.path)
 		})
 	}
 }
@@ -659,7 +659,7 @@ func Test_createObjectPatches(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := createObjectPatches(tt.args.newMap, tt.args.existingMap, tt.args.path, tt.args.override); !reflect.DeepEqual(got, tt.want) {
+			if got := createObjectPatches(tt.args.newMap, &tt.args.existingMap, tt.args.path, tt.args.override); !reflect.DeepEqual(got, tt.want) {
 				assert.Fail(t, "annotation patching failed", "createObjectPatches() = %v, want %v", got, tt.want)
 			}
 		})

@@ -132,59 +132,128 @@ func (patcher *SidecarInjectorPatcher) fixSidecarContainerEnvValue(container *co
 
 //==================================================================================================================================================================
 
-func createContainersPatches(newContainers []corev1.Container, existingContainers []corev1.Container, path string) []admission.PatchOperation {
+func createContainersPatches(newContainers []corev1.Container, existingContainers *[]corev1.Container, path string) []admission.PatchOperation {
 	if len(newContainers) == 0 {
 		// no new containers, so no patch necessary
 		return []admission.PatchOperation{}
 	}
-	if len(existingContainers) == 0 {
+	regexMatchName, _ := regexp.Compile(`^\[\d+\]$`)
+	if len(*existingContainers) == 0 {
 		// pass merge patch if no existing containers
-		return createArrayPatches(newContainers, existingContainers, path)
+		filterContainers := []corev1.Container{}
+		for _, item := range newContainers {
+			if ok := regexMatchName.MatchString(item.Name); ok {
+				filterContainers = append(filterContainers, item)
+			}
+		}
+		return createArrayPatches(filterContainers, existingContainers, path)
 	}
 	// merge existing and new containers
 	var patches []admission.PatchOperation
-	matchExistPod, _ := regexp.Compile(`^\[\d+\]$`)
+	regexMatchIdx, _ := regexp.Compile(`^\[\d+\]$`)
 	for index, item := range newContainers {
-		if !matchExistPod.MatchString(item.Name) {
-			first := index == 0 && len(existingContainers) == 0
-			patches = append(patches, createArrayPatche(item, first, path))
-			continue
+		if !regexMatchIdx.MatchString(item.Name) {
+			idx := findIndexArrayObject(existingContainers, func(that corev1.Container) bool {
+				if item.Name == that.Name {
+					// found matching container name
+					return true
+				} else if strings.HasPrefix(item.Name, "[") && strings.HasSuffix(item.Name, "]") {
+					// check for name match with regex, [regex_str] => match by regex
+					if ok, _ := regexp.MatchString(item.Name[1:len(item.Name)-1], that.Name); ok {
+						return true
+					}
+				}
+				// no match
+				return false
+			})
+			if idx < 0 {
+				if ok := regexMatchName.MatchString(item.Name); ok {
+					// no existing container with same name, so add it
+					first := index == 0 && len(*existingContainers) == 0
+					patches = append(patches, createArrayPatche(item, first, path))
+					*existingContainers = append(*existingContainers, item)
+				}
+				// else ignore
+				continue
+			}
+			// existing container with same name, so merge it
+			item.Name = fmt.Sprintf("[%d]", idx)
 		}
 		idx, _ := strconv.Atoi(item.Name[1 : len(item.Name)-1]) // [0] -> current running container
-		if idx < 0 || idx >= len(existingContainers) {
+		if idx < 0 || idx >= len(*existingContainers) {
 			continue // skip non-exist pod container, not found in existingContainers
 		}
 		// update existing pod container
-		existContainer := existingContainers[idx]
+		existContainer := &(*existingContainers)[idx]
 		indexPath := fmt.Sprintf("%s/%d", path, idx)
 
+		// init container fileds, nil is not allowed
+		if existContainer.EnvFrom == nil {
+			existContainer.EnvFrom = []corev1.EnvFromSource{}
+		}
+		if existContainer.Env == nil {
+			existContainer.Env = []corev1.EnvVar{}
+		}
+		if existContainer.VolumeMounts == nil {
+			existContainer.VolumeMounts = []corev1.VolumeMount{}
+		}
+		if existContainer.VolumeDevices == nil {
+			existContainer.VolumeDevices = []corev1.VolumeDevice{}
+		}
 		// update existing pod container
-		patches = append(patches, createArrayPatches(item.EnvFrom, existContainer.EnvFrom, indexPath+"/envFrom")...)
-		patches = append(patches, createArrayPatches(item.Env, existContainer.Env, indexPath+"/env")...)
-		patches = append(patches, createArrayPatches(item.VolumeMounts, existContainer.VolumeMounts, indexPath+"/volumeMounts")...)
-		patches = append(patches, createArrayPatches(item.VolumeDevices, existContainer.VolumeDevices, indexPath+"/volumeDevices")...)
+		patches = append(patches, createArrayPatches(item.EnvFrom, &existContainer.EnvFrom, indexPath+"/envFrom")...)
+		patches = append(patches, createArrayPatches(item.Env, &existContainer.Env, indexPath+"/env")...)
+		patches = append(patches, createArrayPatches(item.VolumeMounts, &existContainer.VolumeMounts, indexPath+"/volumeMounts")...)
+		patches = append(patches, createArrayPatches(item.VolumeDevices, &existContainer.VolumeDevices, indexPath+"/volumeDevices")...)
 
 		if item.LivenessProbe != nil && existContainer.LivenessProbe == nil {
 			patches = append(patches, admission.PatchOperation{Op: "add", Path: indexPath + "/livenessProbe", Value: item.LivenessProbe})
+			existContainer.LivenessProbe = item.LivenessProbe
 		}
 		if item.ReadinessProbe != nil && existContainer.ReadinessProbe == nil {
 			patches = append(patches, admission.PatchOperation{Op: "add", Path: indexPath + "/readinessProbe", Value: item.ReadinessProbe})
+			existContainer.ReadinessProbe = item.ReadinessProbe
 		}
 		if item.Lifecycle != nil && existContainer.Lifecycle == nil {
 			patches = append(patches, admission.PatchOperation{Op: "add", Path: indexPath + "/lifecycle", Value: item.Lifecycle})
+			existContainer.Lifecycle = item.Lifecycle
 		}
 		if item.SecurityContext != nil && existContainer.SecurityContext == nil {
 			patches = append(patches, admission.PatchOperation{Op: "add", Path: indexPath + "/securityContext", Value: item.SecurityContext})
+			existContainer.SecurityContext = item.SecurityContext
 		}
 	}
 	return patches
 }
 
-func createArrayPatches[T any](newCollection []T, existingCollection []T, path string) []admission.PatchOperation {
+func findIndexArrayObject[T any](items *[]T, exist func(T) bool) int {
+	for idx, item := range *items {
+		if exist(item) {
+			return idx
+		}
+	}
+	return -1
+}
+
+func createArrayPatches[T any](newCollection []T, existingCollection *[]T, path string /*, exist func(T, T) bool*/) []admission.PatchOperation {
+	if len(newCollection) == 0 {
+		// no new collection, so no patch necessary
+		return []admission.PatchOperation{}
+	}
 	var patches []admission.PatchOperation
 	for index, item := range newCollection {
-		first := index == 0 && len(existingCollection) == 0
+		first := index == 0 && len(*existingCollection) == 0
+		// if !first && exist != nil {
+		// 	idx := findIndexArrayObject(existingCollection, func(that T) bool {
+		// 		return exist(item, that)
+		// 	})
+		// 	// item is exist in existingCollection，pass merge patch
+		// 	if idx >= 0 {
+		// 		continue
+		// 	}
+		// }
 		patches = append(patches, createArrayPatche(item, first, path))
+		*existingCollection = append(*existingCollection, item)
 	}
 	return patches
 }
@@ -204,7 +273,11 @@ func createArrayPatche[T any](item T, first bool, path string) admission.PatchOp
 	}
 }
 
-func createObjectPatches(newMap map[string]string, existingMap map[string]string, path string, override bool) []admission.PatchOperation {
+func createObjectPatches(newMap map[string]string, existingMap *map[string]string, path string, override bool) []admission.PatchOperation {
+	if len(newMap) == 0 {
+		// no new map, so no patch necessary
+		return []admission.PatchOperation{}
+	}
 	var patches []admission.PatchOperation
 	if existingMap == nil {
 		patches = append(patches, admission.PatchOperation{
@@ -214,7 +287,7 @@ func createObjectPatches(newMap map[string]string, existingMap map[string]string
 		})
 	} else {
 		for key, value := range newMap {
-			if _, ok := existingMap[key]; !ok || (ok && override) {
+			if _, ok := (*existingMap)[key]; !ok || (ok && override) {
 				key = escapeJSONPath(key)
 				op := "add"
 				if ok {
@@ -225,6 +298,7 @@ func createObjectPatches(newMap map[string]string, existingMap map[string]string
 					Path:  path + "/" + key,
 					Value: value,
 				})
+				(*existingMap)[key] = value
 			}
 		}
 	}
@@ -248,6 +322,26 @@ func (patcher *SidecarInjectorPatcher) PatchPodCreate(ctx context.Context, names
 	}
 	var patches []admission.PatchOperation
 	if configmapSidecarNames := patcher.configmapSidecarNames(namespace, pod); configmapSidecarNames != nil {
+		// init pod fileds, nil is not allowed
+		if pod.Spec.InitContainers == nil {
+			pod.Spec.InitContainers = []corev1.Container{}
+		}
+		if pod.Spec.Containers == nil {
+			pod.Spec.Containers = []corev1.Container{}
+		}
+		if pod.Spec.Volumes == nil {
+			pod.Spec.Volumes = []corev1.Volume{}
+		}
+		if pod.Spec.ImagePullSecrets == nil {
+			pod.Spec.ImagePullSecrets = []corev1.LocalObjectReference{}
+		}
+		if pod.Annotations == nil {
+			pod.Annotations = map[string]string{}
+		}
+		if pod.Labels == nil {
+			pod.Labels = map[string]string{}
+		}
+		// add configmap sidecar
 		for _, configmapSidecarName := range configmapSidecarNames {
 			configmapSidecar, err := patcher.configmapSidecarData(ctx, namespace, configmapSidecarName, pod)
 			if k8serrors.IsNotFound(err) {
@@ -256,12 +350,12 @@ func (patcher *SidecarInjectorPatcher) PatchPodCreate(ctx context.Context, names
 				log.Errorf("error fetching sidecar configmap %s -> %s for %s/%s pod - %v", namespace, configmapSidecarName, namespace, podName, err)
 			} else if configmapSidecar != nil {
 				patcher.fixSidecarByPodAnnotations(configmapSidecar, pod.GetAnnotations()) // fix sidecar by pod annotations
-				patches = append(patches, createContainersPatches(configmapSidecar.InitContainers, pod.Spec.InitContainers, "/spec/initContainers")...)
-				patches = append(patches, createContainersPatches(configmapSidecar.Containers, pod.Spec.Containers, "/spec/containers")...)
-				patches = append(patches, createArrayPatches(configmapSidecar.Volumes, pod.Spec.Volumes, "/spec/volumes")...)
-				patches = append(patches, createArrayPatches(configmapSidecar.ImagePullSecrets, pod.Spec.ImagePullSecrets, "/spec/imagePullSecrets")...)
-				patches = append(patches, createObjectPatches(configmapSidecar.Annotations, pod.Annotations, "/metadata/annotations", patcher.AllowAnnotationOverrides)...)
-				patches = append(patches, createObjectPatches(configmapSidecar.Labels, pod.Labels, "/metadata/labels", patcher.AllowLabelOverrides)...)
+				patches = append(patches, createContainersPatches(configmapSidecar.InitContainers, &pod.Spec.InitContainers, "/spec/initContainers")...)
+				patches = append(patches, createContainersPatches(configmapSidecar.Containers, &pod.Spec.Containers, "/spec/containers")...)
+				patches = append(patches, createArrayPatches(configmapSidecar.Volumes, &pod.Spec.Volumes, "/spec/volumes")...)
+				patches = append(patches, createArrayPatches(configmapSidecar.ImagePullSecrets, &pod.Spec.ImagePullSecrets, "/spec/imagePullSecrets")...)
+				patches = append(patches, createObjectPatches(configmapSidecar.Annotations, &pod.Annotations, "/metadata/annotations", patcher.AllowAnnotationOverrides)...)
+				patches = append(patches, createObjectPatches(configmapSidecar.Labels, &pod.Labels, "/metadata/labels", patcher.AllowLabelOverrides)...)
 			}
 		}
 	}
