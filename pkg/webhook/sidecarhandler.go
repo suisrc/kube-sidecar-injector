@@ -137,7 +137,7 @@ func createContainersPatches(newContainers []corev1.Container, existingContainer
 		// no new containers, so no patch necessary
 		return []admission.PatchOperation{}
 	}
-	regexMatchName, _ := regexp.Compile(`^\[\d+\]$`)
+	regexMatchName, _ := regexp.Compile(`^[\w-]+$`)
 	if len(*existingContainers) == 0 {
 		// pass merge patch if no existing containers
 		filterContainers := []corev1.Container{}
